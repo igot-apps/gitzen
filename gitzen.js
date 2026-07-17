@@ -17,7 +17,6 @@ const success = (msg) => log(`✅ ${msg}`, c.green);
 const error = (msg) => log(`❌ ${msg}`, c.red);
 const info = (msg) => log(`ℹ️  ${msg}`, c.cyan);
 const warn = (msg) => log(`⚠️  ${msg}`, c.yellow);
-
 const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 const ask = (q) => new Promise(resolve => rl.question(`${c.cyan}${q}${c.reset} `, resolve));
 
@@ -25,7 +24,6 @@ async function selectMenu(title, choices) {
     console.log(`\n${c.bold}${c.blue}${title}${c.reset}`);
     choices.forEach((choice, i) => console.log(`  ${c.yellow}${i + 1}${c.reset}) ${choice}`));
     console.log(`  ${c.gray}0) Cancel${c.reset}\n`);
-    
     while (true) {
         const ans = await ask('Select an option: ');
         const num = parseInt(ans);
@@ -113,8 +111,75 @@ async function cmdSave() {
     
     const commitRes = runGit(commitCmd, true);
     if (!commitRes.success) { error('Commit failed: ' + commitRes.output); return; }
-    
     success(`Successfully saved locally! 💾`);
+}
+
+// ==========================================
+// 📂 AI DEBUGGING HELPERS
+// ==========================================
+async function cmdChangedFiles() {
+    log('\n📂 Files modified/created since last commit:\n', c.bold);
+    
+    // Get tracked modified files (ignoring deleted files)
+    const trackedRes = runGit('diff --name-only --diff-filter=d HEAD', true);
+    // Get untracked (new) files
+    const untrackedRes = runGit('ls-files --others --exclude-standard', true);
+
+    let files = [];
+    if (trackedRes.success && trackedRes.output) files.push(...trackedRes.output.split('\n'));
+    if (untrackedRes.success && untrackedRes.output) files.push(...untrackedRes.output.split('\n'));
+
+    // Clean up empty strings
+    files = files.filter(Boolean);
+
+    if (files.length === 0) {
+        warn('No files modified since the last commit!');
+        info('If you are in the middle of a messy merge, use the "Abort" or "Resolve" options.');
+        return;
+    }
+
+    log(`${c.dim}Found ${files.length} file(s). You can copy these paths to upload to your AI:${c.reset}\n`);
+    files.forEach((f, i) => log(`  ${c.yellow}${i + 1}${c.reset}) ${f}`));
+    
+    log(`\n${c.green}💡 Pro-tip: Use the "Generate AI Context" option to format these for your AI!${c.reset}\n`);
+}
+
+async function cmdGenerateAIContext() {
+    log('\n🤖 Generating AI Debugging Context...\n', c.bold);
+    
+    const trackedRes = runGit('diff --name-only --diff-filter=d HEAD', true);
+    const untrackedRes = runGit('ls-files --others --exclude-standard', true);
+
+    let files = [];
+    if (trackedRes.success && trackedRes.output) files.push(...trackedRes.output.split('\n'));
+    if (untrackedRes.success && untrackedRes.output) files.push(...untrackedRes.output.split('\n'));
+    files = files.filter(Boolean);
+
+    if (files.length === 0) {
+        warn('No files modified since the last commit!');
+        return;
+    }
+
+    log(`${c.dim}Reading ${files.length} files... (This will be printed below for you to copy)${c.reset}\n`);
+    log(`${c.gray}──────────────────────────────────────────────────${c.reset}`);
+    
+    // Print the prompt for the AI
+    log(`${c.green}Copy everything below this line and paste it into your AI:${c.reset}\n`);
+    log(`I am working on a feature and introduced a bug. Here are the files I have modified/created since my last working commit. Please review them and help me find the issue:\n`);
+
+    for (const file of files) {
+        try {
+            const content = fs.readFileSync(file, 'utf8');
+            const ext = path.extname(file).replace('.', '');
+            log(`${c.cyan}### File: ${file}${c.reset}`);
+            log(`\`\`\`${ext || 'text'}\n${content}\n\`\`\`\n`);
+        } catch (e) {
+            warn(`Could not read ${file} (might be binary or missing)`);
+        }
+    }
+
+    log(`${c.gray}──────────────────────────────────────────────────${c.reset}`);
+    log(`\n${c.green}✅ Context generated! Copy the text above and paste it into your AI.${c.reset}\n`);
 }
 
 // ==========================================
@@ -124,7 +189,7 @@ async function cmdPush() {
     log('\n🚀 Pushing your local saves to GitHub...\n', c.bold);
     const branch = getCurrentBranch();
     const pushRes = runGit(`push -u origin ${branch}`, true);
-    
+
     if (pushRes.success) {
         success(`Successfully synced with GitHub! 🎉`);
     } else if (pushRes.output.includes('rejected') || pushRes.output.includes('fetch first')) {
@@ -158,12 +223,12 @@ async function smartMerge(branch) {
     let pullRes = runGit(`pull origin ${branch} --no-edit`, true);
     
     if (pullRes.success) { success('Merged successfully!'); return true; }
-
+    
     if (pullRes.output.includes('CONFLICT') || pullRes.output.includes('could not apply')) {
         error('Conflict detected! Let\'s fix it together.');
         return await resolveConflictsInteractively();
     }
-
+    
     error('Smart Merge failed.'); log(pullRes.output, c.gray);
     runGit('merge --abort', true);
     return false;
@@ -174,11 +239,10 @@ async function smartMerge(branch) {
 // ==========================================
 async function resolveConflictsInteractively() {
     log('\n⚔️  Interactive Conflict Resolver\n', c.bold);
-    
     while (true) {
         const unmergedRes = runGit('diff --name-only --diff-filter=U', true);
         const unmergedFiles = unmergedRes.output.split('\n').filter(Boolean);
-        
+
         if (unmergedFiles.length === 0) {
             success('All conflicts resolved! 🎉');
             info('Finishing the merge...');
@@ -189,23 +253,23 @@ async function resolveConflictsInteractively() {
             const isRebasing = fs.existsSync(path.join(process.cwd(), '.git', 'rebase-merge'));
             if (isMerging) runGit('commit --no-edit', true);
             else if (isRebasing) runGit('rebase --continue', true);
-            
             return true;
         }
-        
+
         log(`You have ${unmergedFiles.length} conflicted file(s):`, c.yellow);
         unmergedFiles.forEach((f, i) => log(`  ${c.yellow}${i + 1}${c.reset}) ${f}`, c.reset));
         log(`  ${c.gray}0) Abort merge and give up${c.reset}\n`);
-        
+
         const fileAns = await ask('Select a file to resolve (or 0 to abort): ');
         const fileIdx = parseInt(fileAns);
-        
+
         if (fileIdx === 0) {
             if ((await ask('Abort merge? (yes/no): ')).toLowerCase() === 'yes') {
                 runGit('merge --abort', true); return false;
             }
             continue;
         }
+
         if (fileIdx > 0 && fileIdx <= unmergedFiles.length) {
             await resolveFile(unmergedFiles[fileIdx - 1]);
         }
@@ -217,7 +281,7 @@ async function resolveFile(filePath) {
     const conflictRegex = /<<<<<<<[^\n]*\n([\s\S]*?)=======\n([\s\S]*?)>>>>>>>[^\n]*\n?/g;
     const match = conflictRegex.exec(content);
     const hasVSCode = isVSCodeAvailable();
-    
+
     // 🌟 Visual Display of the Conflict
     if (match) {
         log(`\n${c.yellow}⚠️ Conflict detected${c.reset}`);
@@ -236,7 +300,6 @@ async function resolveFile(filePath) {
         '🟢 Keep Mine (Accept your local changes)',
         '🔵 Keep GitHub (Accept incoming changes)'
     ];
-    
     if (hasVSCode) choices.push('📝 Open VS Code Merge Editor (Recommended for manual combination)');
     else choices.push('📝 Open in Default Editor');
     choices.push('🔙 Back to file list');
@@ -255,9 +318,9 @@ async function resolveFile(filePath) {
             runGit(`add "${filePath}"`, true);
             success(`Kept GitHub version!`); return;
         }
-        
+
         // Open Editor (VS Code or Fallback)
-        if (action === 2) { 
+        if (action === 2) {
             if (hasVSCode) {
                 info('Opening VS Code Merge Editor...');
                 log('Use the buttons in VS Code to resolve. Save when done.', c.gray);
@@ -296,9 +359,11 @@ async function cmdUndo() {
     log('\n⏪ Time Machine...\n', c.bold);
     const logRes = runGit('log -n 10 --pretty=format:"%H|%ad|%s" --date=short', true);
     if (!logRes.output) { warn('No history.'); return; }
+
     const commits = logRes.output.split('\n').filter(Boolean);
     const idx = await selectMenu('Select a save to revert to:', commits.map(c => c.split('|')[2]));
     if (idx === null) return;
+
     const hash = commits[idx].split('|')[0];
     const backup = `gitzen-safety-${Date.now()}`;
     runGit(`branch ${backup}`, true);
@@ -310,6 +375,7 @@ async function cmdHistory() {
     log('\n📜 Project History\n', c.bold);
     const logRes = runGit('log --pretty=format:"%h | %ad | %s" --date=format:"%Y-%m-%d %H:%M"', true);
     if (!logRes.output) { warn('No history.'); return; }
+
     logRes.output.split('\n').forEach(line => {
         const p = line.split(' | ');
         console.log(`${c.yellow}${p[0]}${c.reset} | ${c.cyan}${p[1]}${c.reset} | ${p[2]}`);
@@ -319,11 +385,12 @@ async function cmdHistory() {
 async function cmdCleanup() {
     log('\n🧹 Cleaning up temporary branches...\n', c.bold);
     const branches = runGit('branch --format="%(refname:short)"', true).output.split('\n').filter(b => b.startsWith('gitzen-'));
-    if (branches.length === 0) { success('Already clean! ✨'); return; }
     
+    if (branches.length === 0) { success('Already clean! ✨'); return; }
+
     const action = await selectMenu(`Found ${branches.length} temp branches.`, ['🗑️ Delete ALL', '🎯 Delete SPECIFIC', 'Cancel']);
     if (action === null || action === 2) return;
-    
+
     if (getCurrentBranch().startsWith('gitzen-')) runGit('checkout main', true);
 
     if (action === 0) {
@@ -348,6 +415,7 @@ async function cmdSwitch() {
         '🌿 Switch between branches',
         '🧹 Clean up temporary branches'
     ]);
+
     if (action === null) return;
 
     if (action === 0) {
@@ -362,7 +430,7 @@ async function cmdSwitch() {
         runGit('checkout main', true);
         success('✅ Returned to main.');
         if (!keep) { runGit(`branch -D ${current}`, true); success('🗑 Temp branch deleted.'); }
-    } 
+    }
     else if (action === 1) {
         const commits = runGit('log -n 15 --pretty=format:"%H|%ad|%s" --date=short', true).output.split('\n').filter(Boolean);
         const idx = await selectMenu('Travel to:', commits.map(c => `${c.split('|')[1]} ${c.split('|')[2]}`));
@@ -371,7 +439,7 @@ async function cmdSwitch() {
             runGit(`checkout -b gitzen-view-${hash.substring(0,7)} ${hash}`, true);
             success('Viewing past version! 👀');
         }
-    } 
+    }
     else if (action === 2) {
         const branches = runGit('branch --format="%(refname:short)"', true).output.split('\n').filter(b => b && b !== getCurrentBranch());
         const idx = await selectMenu('Switch to:', branches);
@@ -394,6 +462,8 @@ async function main() {
         if (action === 'push') return cmdPush();
         if (action === 'undo') return cmdUndo();
         if (action === 'history') return cmdHistory();
+        if (action === 'changed') return cmdChangedFiles();
+        if (action === 'context') return cmdGenerateAIContext();
         if (action === 'abort') return cmdAbort();
         if (action === 'switch') return cmdSwitch();
         if (action === 'cleanup') return cmdCleanup();
@@ -405,6 +475,8 @@ async function main() {
         '🔀 Switch (Time Travel / Branches)',
         '⏪ Undo (Revert to previous save)',
         '📜 History (View past saves)',
+        '📂 List Changed Files (For AI)',
+        '🤖 Generate AI Context (Copy/Paste)',
         '🧹 Cleanup (Delete temp branches)',
         '🛑 Abort (Cancel messy merge)',
         '🛠️  Setup (Re-configure)'
@@ -415,9 +487,11 @@ async function main() {
     else if (choice === 2) await cmdSwitch();
     else if (choice === 3) await cmdUndo();
     else if (choice === 4) await cmdHistory();
-    else if (choice === 5) await cmdCleanup();
-    else if (choice === 6) await cmdAbort();
-    else if (choice === 7) await cmdSetup();
+    else if (choice === 5) await cmdChangedFiles();
+    else if (choice === 6) await cmdGenerateAIContext();
+    else if (choice === 7) await cmdCleanup();
+    else if (choice === 8) await cmdAbort();
+    else if (choice === 9) await cmdSetup();
 
     rl.close();
 }
