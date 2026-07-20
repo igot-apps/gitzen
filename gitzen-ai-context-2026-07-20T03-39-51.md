@@ -1,3 +1,7 @@
+I am working on a feature and introduced a bug. Here are the files I have modified/created since my last working commit. Please review them and help me find the issue:
+
+### File: gitzen.js
+```js
 #!/usr/bin/env node
 const { execSync } = require('child_process');
 const fs = require('fs');
@@ -510,3 +514,11 @@ async function main() {
 }
 
 main().catch(err => { error(err.message); rl.close(); });
+```
+
+### File: another-test-file.txt
+```txt
+here for testing
+yes
+```
+

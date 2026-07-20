@@ -11,9 +11,9 @@ GitZen is a zero-dependency, interactive CLI tool that turns complex, scary Git 
 
 ## ✨ Core Features
 
+- 🤖 **AI-Assisted Debugging**: Instantly list all files changed since your last commit, or generate a perfectly formatted context block to feed directly into your AI coding assistant (with options to print to terminal or save as a `.md` file).
 - 🪄 **Smart Push & Merge**: Automatically detects when GitHub has newer files and offers a safe "Smart Merge" or a "Force Overwrite" option.
 - ⚔️ **Visual Conflict Resolver**: Say goodbye to ugly `<<<<<<< HEAD` markers. GitZen parses conflicts and shows you a beautiful, color-coded terminal UI to resolve them safely.
-- 🤖 **AI-Assisted Debugging**: Instantly list all files changed since your last commit, or generate a perfectly formatted, copy-pasteable context block to feed directly into your AI coding assistant.
 - 🕰️ **Time Travel**: Safely checkout and view past versions of your code without getting stuck in "Detached HEAD" mode.
 - 🧹 **Workspace Cleanup**: One-click command to delete all temporary viewing branches.
 - 🛡️ **Safety First**: Automatically creates backup branches before doing destructive actions like `undo`.
@@ -34,7 +34,7 @@ GitZen is a zero-dependency, interactive CLI tool that turns complex, scary Git 
    ```
    *(This will initialize Git, set up your identity, create a `.gitignore`, and optionally connect your GitHub remote.)*
 
-3. **Start using GitZen:**
+3. **Start using GitZen interactively:**
    ```bash
    node gitzen1.js
    ```
@@ -43,16 +43,19 @@ GitZen is a zero-dependency, interactive CLI tool that turns complex, scary Git 
 
 ## 🤖 AI-Assisted Debugging Workflow
 
-One of the biggest challenges when working with AI is giving it the right context without overwhelming it with your entire codebase. GitZen solves this with two powerful new commands:
+One of the biggest challenges when working with AI is giving it the right context without overwhelming it with your entire codebase. GitZen solves this with two powerful commands:
 
 ### 1. List Changed Files
 If you get lost in the code and don't know what broke, you can instantly see exactly which files you've touched since your last working commit.
 - **Menu:** Select `📂 List Changed Files (For AI)`
 - **CLI:** `node gitzen1.js changed`
 
-### 2. Generate AI Context (Copy/Paste)
-Take it a step further! This command reads all the files you've modified since the last commit and prints them out in a perfectly formatted Markdown block. Just highlight, copy, and paste it directly into your AI chat.
-- **Menu:** Select `🤖 Generate AI Context (Copy/Paste)`
+### 2. Generate AI Context (File or Terminal)
+Take it a step further! This command reads all the files you've modified since the last commit and formats them perfectly for an AI. It will prompt you to choose how you want the output:
+* **📄 Save to a Markdown file (.md):** Creates a neatly named, timestamped file (e.g., `gitzen-ai-context-2023-10-25T14-30-00.md`) in your project folder. Perfect for uploading directly to AI chat interfaces.
+* **🖥️ Print to Terminal:** Prints the formatted code blocks directly to your console so you can quickly highlight, copy, and paste.
+
+- **Menu:** Select `🤖 Generate AI Context (File/Terminal)`
 - **CLI:** `node gitzen1.js context`
 
 *💡 Pro-tip: Using the `context` command ensures your AI only looks at the files you actually changed, resulting in faster, more accurate debugging and zero accidental leaks of your `.env` or `node_modules`!*
@@ -70,7 +73,7 @@ While GitZen is designed to be used interactively, you can also trigger specific
 | `node gitzen1.js save` | Stage and commit all changes locally |
 | `node gitzen1.js push` | Push to GitHub (with smart merge fallback) |
 | `node gitzen1.js changed` | List files modified since the last commit |
-| `node gitzen1.js context` | Generate AI-ready copy/paste context |
+| `node gitzen1.js context` | Generate AI-ready context (File or Terminal) |
 | `node gitzen1.js undo` | Revert to a previous commit (with safety backup) |
 | `node gitzen1.js history` | View a clean, formatted commit history |
 | `node gitzen1.js switch` | Time travel, switch branches, or return to main |
